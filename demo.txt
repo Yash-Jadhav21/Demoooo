@@ -1,0 +1,142 @@
+7A
+
+# IPsec
+
+class Policy:
+    def __init__(self, local_subnet, remote_subnet, mode, pfs, esp):
+        self.local_subnet = local_subnet
+        self.remote_subnet = remote_subnet
+        self.mode = mode
+        self.pfs = pfs
+        self.esp = esp
+
+class Connection:
+    def __init__(self, local_ip, remote_ip):
+        self.local_ip = local_ip
+        self.remote_ip = remote_ip
+        self.policies = []
+        self.shared_secret = None
+
+    def add_policy(self, policy):
+        self.policies.append(policy)
+
+    def set_psk(self, shared_secret):
+        self.shared_secret = shared_secret
+
+    def up(self):
+        print("IPsec connection starts!!")
+        print(f"The local ip: {self.local_ip}")
+        print(f"The remote ip: {self.remote_ip}")
+        for policy in self.policies:
+            print("In Policy:")
+            print(f"The local subnet: {policy.local_subnet}")
+            print(f"The remote subnet: {policy.remote_subnet}")
+            print(f"The Mode: {policy.mode}")
+            print(f"The PFS: {policy.pfs}")
+            print(f"The esp: {policy.esp}")
+        print(f"The Shared Secret: {self.shared_secret}")
+        print("The Connection is up!!!")
+
+# name = "Main"
+local_ip = "192.168.1.1"
+remote_ip = "192.168.2.2"
+local_subnet = "10.0.0.0/24"
+remote_subnet = "10.0.1.0/24"
+shared_secret = "India is the best!!"
+connection = Connection(local_ip, remote_ip)
+
+outbound_policy = Policy(remote_subnet, local_subnet,
+                         mode="tunnel", pfs="group14", esp="aes128-sha256")
+
+inbound_policy = Policy(local_subnet, remote_subnet,
+                        mode="tunnel", pfs="group14", esp="aes128-sha256")
+
+connection.add_policy(inbound_policy)
+connection.add_policy(outbound_policy)
+connection.set_psk(shared_secret)
+connection.up()
+
+
+------------------------------------------------------------------------------------------
+#7B Sender's side
+
+from Crypto.Cipher import AES
+import socket
+
+key = b"ThisIsASecretKey"
+cipher = AES.new(key, AES.MODE_EAX)
+
+data = b"This is a secret IP packet"
+nonce = cipher.nonce
+ciphertext, tag = cipher.encrypt_and_digest(data)
+
+s = socket.socket()
+s.connect(("localhost", 9999))
+
+s.send(nonce + ciphertext)
+s.close()
+----------------------------------------------------------------------------------------------
+#7B Receiver's side
+
+from Crypto.Cipher import AES
+import socket
+
+key = b"ThisIsASecretKey"
+server = socket.socket()
+server.bind(("localhost", 9999))
+server.listen(1)
+print("Waiting for encrypted packet")
+
+conn, addr = server.accept()
+data = conn.recv(1024)
+
+nonce = data[:16]
+ciphertext = data[16:]
+
+cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
+plaintext = cipher.decrypt(ciphertext)
+
+print("Decrypted msg:", plaintext.decode())
+
+-----------------------------------------------------------------------------------------------
+#8 IDS
+
+#intrution detection system
+
+import random
+import time
+from datetime import datetime
+
+traffic_data=[{"source":"192.168.1.1","destination":"10.0.0.1","port":22,"payload":"india","protocol":"TCP"},
+              {"source":"10.0.0.2","destination":"192.168.1.2","port":80,"payload":"Siddhi","protocol":"TCP"},
+              {"source":"10.0.0.3","destination":"10.0.0.1","port":21,"payload":"tejasvi","protocol":"TCP"},
+              {"source":"unknown","destination":"192.168.1.1","port":443,"payload":"unknow US","protocol":"TCP"}
+              ]
+
+def is_suspicious(packet):
+    suspicious_source=["unknown","192.168.1.1"]
+    suspicious_port=[21,809]
+    return packet["source"] in suspicious_source or packet["port"] in suspicious_port
+
+def generate_alert(packet,is_suspicious):
+    status="suspicious" if is_suspicious else "non-suspicious"
+    msg = f"{status} packet is detected"
+    msg += f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    for key,Value in packet.items():
+        msg +=f"{key}:{Value}\n"
+    return msg
+
+def alert_log(msg):
+    with open ("alerts.log","a") as f:
+        f.write(msg+"\n")
+
+
+for packet in traffic_data:
+    suspicious=is_suspicious(packet)
+    alert_msg=generate_alert(packet,suspicious)
+    print(alert_msg)
+    alert_log(alert_msg)
+
+    
+    
+              
